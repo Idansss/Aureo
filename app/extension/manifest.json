@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Aureo Autofill & Tracker",
+  "version": "0.1.0",
+  "description": "Capture external job applications into Aureo and prepare autofill.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+
+
+
