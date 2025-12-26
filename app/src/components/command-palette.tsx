@@ -88,8 +88,8 @@ export function CommandPalette({ trigger }: { trigger: React.ReactElement }) {
 
   const commands = React.useMemo<CommandItem[]>(() => {
     const dashboardHref =
-      pathname.startsWith(routes.dashboard.employer) || pathname.startsWith(routes.employer.dashboard)
-        ? routes.dashboard.employer
+      pathname.startsWith(routes.employer.dashboard) || pathname.startsWith("/dashboard/employer")
+        ? routes.employer.dashboard
         : routes.app.dashboard
 
     return [

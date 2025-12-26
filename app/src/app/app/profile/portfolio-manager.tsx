@@ -116,7 +116,7 @@ export function PortfolioManager({ items }: { items: PortfolioItem[] }) {
         <EmptyState
           title="No portfolio items yet"
           description="Add a case study or public work sample. Links should be accessible without login."
-          icon={ExternalLink}
+          icon="ExternalLink"
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">

@@ -29,11 +29,11 @@ const AvatarImage = React.forwardRef<
 ));
 AvatarImage.displayName = AvatarPrimitive.Image.displayName;
 
-const AvatarFallback = React.forwardRef<
-  React.ElementRef<typeof AvatarPrimitive.Fallback>,
-  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
+const AvatarPlaceholder = React.forwardRef<
+  HTMLSpanElement,
+  React.HTMLAttributes<HTMLSpanElement>
 >(({ className, ...props }, ref) => (
-  <AvatarPrimitive.Fallback
+  <span
     ref={ref}
     className={cn(
       "flex h-full w-full items-center justify-center bg-primary/15 text-sm font-semibold text-foreground",
@@ -42,6 +42,6 @@ const AvatarFallback = React.forwardRef<
     {...props}
   />
 ));
-AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
+AvatarPlaceholder.displayName = "AvatarPlaceholder";
 
-export { Avatar, AvatarImage, AvatarFallback };
+export { Avatar, AvatarImage, AvatarPlaceholder };

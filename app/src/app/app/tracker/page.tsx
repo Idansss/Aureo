@@ -12,7 +12,7 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { EmptyState } from "@/components/empty-state"
 import { AuthGuard } from "@/lib/auth-guard"
-import { Briefcase, Bookmark, Send, CheckCircle2, XCircle, Gift } from "lucide-react"
+import { Bookmark, Send, CheckCircle2, XCircle, Gift } from "lucide-react"
 import { toast } from "sonner"
 import type { JobTracker } from "@/lib/types-extended"
 import { JobTrackerModal } from "@/components/job-tracker-modal"
@@ -165,7 +165,7 @@ function TrackerPageContent() {
           <Card>
             <CardContent className="p-12">
               <EmptyState
-                icon={Briefcase}
+                icon="Briefcase"
                 title="No jobs tracked yet"
                 description="Start tracking jobs from your inbox or job listings"
                 action={{

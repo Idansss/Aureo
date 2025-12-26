@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { CheckCircle2, Filter, SearchX } from "lucide-react"
+import { CheckCircle2, Filter } from "lucide-react"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { EmployerCard } from "@/components/employers/employer-card"
@@ -94,7 +94,7 @@ export default async function EmployersDirectoryPage({ searchParams }: { searchP
           {filtered.length === 0 ? (
             <div className="rounded-[var(--radius)] border border-border bg-muted p-10">
               <EmptyState
-                icon={SearchX}
+                icon="SearchX"
                 title="No employers match these filters"
                 description="Try adjusting filters or reset to see all employers."
                 action={{ label: "Reset", href: "/employers" }}

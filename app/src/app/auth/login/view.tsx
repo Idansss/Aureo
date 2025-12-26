@@ -51,6 +51,11 @@ export function LoginForm({ next }: { next?: string }) {
       return;
     }
 
+    // Dispatch session change event to update UI
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("aureo:session-change"));
+    }
+
     const user = session.user;
     let role: string | null | undefined = user.user_metadata?.role;
 

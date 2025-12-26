@@ -1,35 +1,45 @@
 "use client"
 
-import type { LucideIcon } from "lucide-react"
+import { Bookmark, Briefcase, ExternalLink, Inbox, Search, SearchX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { IconBadge } from "@/components/ui/icon-badge"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 
+const ICONS = {
+  SearchX,
+  Search,
+  ExternalLink,
+  Bookmark,
+  Inbox,
+  Briefcase,
+} as const
+
+export type EmptyStateIconName = keyof typeof ICONS
+
 interface EmptyStateProps {
-  icon?: LucideIcon
+  icon?: EmptyStateIconName
   title: string
   description: string
   action?: {
     label: string
-    onClick?: () => void
     href?: string
   }
   className?: string
 }
 
 export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
+  const ResolvedIcon = Icon ? ICONS[Icon] : null
   return (
     <div className={cn("flex flex-col items-center justify-center p-8 text-center", className)}>
-      {Icon && (
-        <IconBadge icon={Icon} size="lg" tone="neutral" className="mb-4" />
+      {ResolvedIcon && (
+        <IconBadge icon={ResolvedIcon} size="lg" tone="neutral" className="mb-4" />
       )}
       <h3 className="text-lg font-semibold mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground mb-6 max-w-sm">{description}</p>
       {action && (
         <Button
           asChild={!!action.href}
-          onClick={action.onClick}
           className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           {action.href ? (

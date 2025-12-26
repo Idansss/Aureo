@@ -30,6 +30,8 @@ export default function JobDetailPage() {
   const [job, setJob] = React.useState<Job | null>(null)
   const [similarJobs, setSimilarJobs] = React.useState<Job[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [jobStatus, setJobStatus] = React.useState<"ACTIVE" | "CLOSED" | null>(null)
+  const [alreadyApplied, setAlreadyApplied] = React.useState(false)
 
   React.useEffect(() => {
     if (!jobId) return
@@ -47,11 +49,13 @@ export default function JobDetailPage() {
       if (jobErr || !jobRow) {
         setJob(null)
         setSimilarJobs([])
+        setJobStatus(null)
         setLoading(false)
         return
       }
 
       setJob(jobRecordToManifest(jobRow as any as JobRecord))
+      setJobStatus((jobRow as any).is_active === false ? "CLOSED" : "ACTIVE")
 
       const { data: similar } = await supabase
         .from("jobs")
@@ -64,6 +68,20 @@ export default function JobDetailPage() {
         .limit(2)
 
       setSimilarJobs(((similar as any) ?? []).map((r: JobRecord) => jobRecordToManifest(r)))
+
+      // Determine if current user already applied
+      const { data: auth } = await supabase.auth.getUser()
+      if (auth.user) {
+        const { data: appRow } = await supabase
+          .from("applications")
+          .select("id")
+          .eq("job_id", jobId)
+          .eq("user_id", auth.user.id)
+          .maybeSingle()
+        setAlreadyApplied(Boolean(appRow))
+      } else {
+        setAlreadyApplied(false)
+      }
       setLoading(false)
     })()
   }, [jobId])
@@ -95,6 +113,9 @@ export default function JobDetailPage() {
       </div>
     )
   }
+
+  const blockedReason =
+    jobStatus === "CLOSED" ? "This role is closed." : null
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -150,8 +171,29 @@ export default function JobDetailPage() {
                     </div>
                   ) : null}
 
+                  {jobStatus && jobStatus !== "ACTIVE" ? (
+                    <div className="rounded-[var(--radius)] border border-border bg-muted/40 p-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize">
+                          {jobStatus.toLowerCase()}
+                        </Badge>
+                        <span className="text-muted-foreground">{blockedReason ?? "This role is not accepting applications."}</span>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="flex flex-wrap gap-3 pt-2">
-                    <ApplyFlowDialog jobId={job.id} triggerLabel="Apply Now" triggerVariant="primary" triggerClassName="w-full md:w-auto" />
+                    {alreadyApplied ? (
+                      <Button type="button" variant="outline" disabled className="w-full md:w-auto">
+                        Applied
+                      </Button>
+                    ) : blockedReason ? (
+                      <Button type="button" variant="outline" disabled className="w-full md:w-auto">
+                        {blockedReason}
+                      </Button>
+                    ) : (
+                      <ApplyFlowDialog jobId={job.id} triggerLabel="Apply Now" triggerVariant="primary" triggerClassName="w-full md:w-auto" />
+                    )}
                     <SaveJobCtaButton jobId={job.id} variant="outline" className="w-full md:w-auto" />
                     <CopyLinkButton label="Share" variant="outline" icon={Share2} />
                     <ReportJobDialog

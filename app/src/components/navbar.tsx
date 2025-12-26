@@ -4,12 +4,14 @@ import { useMemo, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Container } from "@/components/container"
 import { Briefcase, Menu, LogOut, User, Bell, Settings } from "lucide-react"
 import { IconBadge } from "@/components/ui/icon-badge"
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { useAuth, signOut } from "@/lib/use-auth"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { useViewer } from "@/lib/use-viewer"
+import { logout } from "@/lib/logout"
+import { Avatar, AvatarImage, AvatarPlaceholder } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,20 +21,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useSettings } from "@/components/settings/settings-provider"
-import { isDemoMode } from "@/lib/demo-mode"
-import { Badge } from "@/components/ui/badge"
-import { getActiveSeekerId, useStoreSnapshot } from "@/lib/store"
 import { routes } from "@/lib/routes"
 
 export function Navbar() {
   const router = useRouter()
-  const { isAuthenticated, user, ready } = useAuth()
+  const viewer = useViewer()
   const { settings } = useSettings()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const demo = isDemoMode()
-  const snap = useStoreSnapshot()
-  const isReadyAndAuthed = ready && isAuthenticated && Boolean(user)
+  const isReadyAndAuthed = viewer.ready && viewer.isAuthenticated && Boolean(viewer.user)
+  const user = viewer.user
 
   useEffect(() => {
     setMounted(true)
@@ -44,22 +42,20 @@ export function Navbar() {
     setAvatarUrl(null)
   }, [user])
 
-  const handleLogout = () => {
-    signOut().finally(() => router.push("/"))
+  const handleLogout = async () => {
+    try {
+      await logout({ router })
+    } catch (error) {
+      // Error already handled in logout function
+    }
   }
 
-  const isLoggedIn = ready && isAuthenticated
+  const isLoggedIn = viewer.ready && viewer.isAuthenticated
 
   const showSeekerNav = useMemo(() => {
     if (isLoggedIn && user) return user.role !== "employer"
-    return demo
-  }, [demo, isLoggedIn, user])
-
-  const unreadAlerts = useMemo(() => {
-    if (!demo || !mounted) return 0
-    const seekerId = getActiveSeekerId()
-    return (snap?.alerts ?? []).filter((a) => a.seekerId === seekerId && !a.readAt).length
-  }, [demo, mounted, snap?.alerts])
+    return false
+  }, [isLoggedIn, user])
 
   const dashboardHref = useMemo(() => {
     if (user?.role === "employer") return routes.employer.dashboard
@@ -71,7 +67,7 @@ export function Navbar() {
     return routes.app.profile
   }, [user?.role])
   
-  // Use username from settings, or fallback to user.name
+  // Use username from settings, or default to user.name
   const displayName = useMemo(() => {
     return settings.account.username || user?.fullName || user?.email || "User"
   }, [settings.account.username, user?.fullName, user?.email])
@@ -108,19 +104,8 @@ export function Navbar() {
               Find Jobs
             </Link>
             {isLoggedIn && user ? (
-              user.role === "employer" ? (
-                <Link href="/employer" className="text-sm font-medium hover:text-primary transition-colors">
-                  Dashboard
-                </Link>
-              ) : (
+              user.role !== "employer" ? (
                 <>
-                  <Link href="/app" className="text-sm font-medium hover:text-primary transition-colors">
-                    Dashboard
-                  </Link>
-                  <Link href="/alerts" className="text-sm font-medium hover:text-primary transition-colors inline-flex items-center gap-2">
-                    Alerts
-                    {demo && unreadAlerts ? <Badge variant="accent">{unreadAlerts}</Badge> : null}
-                  </Link>
                   <Link href="/app/saved" className="text-sm font-medium hover:text-primary transition-colors">
                     Saved Jobs
                   </Link>
@@ -131,13 +116,12 @@ export function Navbar() {
                     Inbox
                   </Link>
                 </>
-              )
+              ) : null
             ) : (
               <>
                 {showSeekerNav ? (
-                  <Link href="/alerts" className="text-sm font-medium hover:text-primary transition-colors inline-flex items-center gap-2">
+                  <Link href="/alerts" className="text-sm font-medium hover:text-primary transition-colors">
                     Alerts
-                    {demo && unreadAlerts ? <Badge variant="accent">{unreadAlerts}</Badge> : null}
                   </Link>
                 ) : (
                   <Link href="/employer" className="text-sm font-medium hover:text-primary transition-colors">
@@ -159,14 +143,6 @@ export function Navbar() {
                     className="flex h-full w-full items-center justify-center"
                   >
                     <Bell className="h-5 w-5" />
-                    {demo && unreadAlerts ? (
-                      <Badge
-                        variant="accent"
-                        className="absolute -top-1 -right-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                      >
-                        {unreadAlerts}
-                      </Badge>
-                    ) : null}
                   </Link>
                 </Button>
                 <Link
@@ -180,7 +156,7 @@ export function Navbar() {
                     <Button variant="ghost" className="gap-2 px-2">
                       <Avatar className="h-8 w-8">
                         {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                        <AvatarFallback>{userInitials}</AvatarFallback>
+                        <AvatarPlaceholder>{userInitials}</AvatarPlaceholder>
                       </Avatar>
                       <span className="hidden sm:inline">{displayName}</span>
                     </Button>
@@ -214,7 +190,7 @@ export function Navbar() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
-            ) : ready ? (
+            ) : viewer.ready ? (
               <>
                 <Link
                   href="/auth/login"
@@ -257,7 +233,7 @@ export function Navbar() {
                     </SheetClose>
                     <SheetClose asChild>
                       <Link href="/alerts" className="text-lg font-medium hover:text-primary transition-colors">
-                        Alerts{demo && unreadAlerts ? ` (${unreadAlerts})` : ""}
+                        Alerts
                       </Link>
                     </SheetClose>
                     {user?.role !== "employer" ? (
@@ -312,7 +288,7 @@ export function Navbar() {
                     {showSeekerNav ? (
                       <SheetClose asChild>
                         <Link href="/alerts" className="text-lg font-medium hover:text-primary transition-colors">
-                          Alerts{demo && unreadAlerts ? ` (${unreadAlerts})` : ""}
+                          Alerts
                         </Link>
                       </SheetClose>
                     ) : (
@@ -342,7 +318,7 @@ export function Navbar() {
                         </Button>
                       </SheetClose>
                     </>
-                  ) : ready ? (
+                  ) : viewer.ready ? (
                     <>
                       <SheetClose asChild>
                         <Link

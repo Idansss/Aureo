@@ -42,8 +42,8 @@ export function resolvePostAuthRedirect(options: {
   next: string | null | undefined;
 }): string {
   const safeNext = resolveSafeNext(options.next);
-  const fallback = defaultRouteForRole(options.role);
-  if (!safeNext) return fallback;
-  return isNextCompatibleWithRole(safeNext, options.role) ? safeNext : fallback;
+  const defaultRoute = defaultRouteForRole(options.role);
+  if (!safeNext) return defaultRoute;
+  return isNextCompatibleWithRole(safeNext, options.role) ? safeNext : defaultRoute;
 }
 

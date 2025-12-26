@@ -65,7 +65,6 @@ export function RegisterForm({ next }: { next?: string }) {
 
   const onSubmit = async (values: RegisterValues) => {
     const safeNext = resolveSafeNext(values.next) ?? safeNextFromProps;
-
     const supabase = supabaseBrowser();
     const emailRedirectTo = buildEmailRedirectTo(safeNext);
     const { data, error } = await supabase.auth.signUp({
@@ -110,6 +109,11 @@ export function RegisterForm({ next }: { next?: string }) {
       role: values.accountType,
       next: safeNext,
     });
+
+    // Dispatch session change event to update UI
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("aureo:session-change"));
+    }
 
     toast.success("Account created. Welcome!");
     router.replace(destination);

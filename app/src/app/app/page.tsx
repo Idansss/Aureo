@@ -14,14 +14,13 @@ import { supabaseServer } from "@/lib/supabase/server"
 import { getServerUser } from "@/lib/auth-server"
 import { jobRecordToManifest } from "@/lib/job-presenter"
 import type { Job, JobRecord } from "@/lib/types"
-
 export default async function DashboardPage() {
   const user = await getServerUser()
   if (!user) redirect("/auth/login")
 
   const supabase = await supabaseServer()
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
-  if (profile?.role === "employer") redirect("/dashboard/employer")
+  if (profile?.role === "employer") redirect("/employer")
 
   const [{ count: applicationsCount }, { count: savedCount }, { count: alertsCount }, { count: remindersCount }] =
     await Promise.all([

@@ -33,7 +33,7 @@ export function SavedJobsClient() {
       <EmptyState
         title="No saved jobs yet"
         description="Use the bookmark icon on a job card to save roles for later."
-        icon={Bookmark}
+        icon="Bookmark"
         action={{ label: "Browse jobs", href: "/jobs" }}
       />
     );

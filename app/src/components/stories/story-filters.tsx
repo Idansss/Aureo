@@ -2,7 +2,6 @@
 
 import type { Story } from "@/lib/stories";
 import { useMemo, useState } from "react";
-import { SearchX } from "lucide-react";
 import { StoryCard } from "./story-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +62,7 @@ export function StoryFilters({ stories, categories }: StoryFiltersProps) {
         <EmptyState
           title="No stories found"
           description="Try another keyword or switch categories."
-          icon={SearchX}
+          icon="SearchX"
         />
       ) : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">

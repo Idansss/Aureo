@@ -1,6 +1,5 @@
 import * as React from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { isDemoMode } from "@/lib/demo-mode";
 
 export type AuthSnapshot = {
   isAuthenticated: boolean;
@@ -18,35 +17,17 @@ export type AuthState = AuthSnapshot & {
   ready: boolean;
 };
 
-const DEMO_SNAPSHOT: AuthSnapshot = {
-  isAuthenticated: true,
-  user: {
-    id: "seeker_demo",
-    email: "demo@seeker.com",
-    role: "seeker",
-    fullName: "Demo Seeker",
-  },
-};
-
+/**
+ * @deprecated Use useViewer() from @/lib/use-viewer instead.
+ * This hook is kept for backwards compatibility but will be removed in the future.
+ */
 export function useAuth(): AuthState {
   const [snapshot, setSnapshot] = React.useState<AuthSnapshot>(serverSnapshot);
   const [ready, setReady] = React.useState(false);
-  const demo = isDemoMode();
 
   React.useEffect(() => {
     let active = true;
     setReady(false);
-
-    const finalize = () => {
-      if (!active) return;
-      setReady(true);
-    };
-
-    if (demo) {
-      setSnapshot(DEMO_SNAPSHOT);
-      finalize();
-      return;
-    }
 
     const supabase = supabaseBrowser();
 
@@ -100,7 +81,7 @@ export function useAuth(): AuthState {
       } finally {
         if (!active) return;
         setSnapshot(next);
-        finalize();
+        setReady(true);
       }
     };
 
@@ -112,23 +93,8 @@ export function useAuth(): AuthState {
     return () => {
       active = false;
       sub.subscription.unsubscribe();
-    }
-  }, [demo]);
+    };
+  }, []);
 
   return { ...snapshot, ready };
-}
-
-export async function signOut() {
-  // Clear both localStorage session (browser) and auth cookies (server).
-  try {
-    const supabase = supabaseBrowser();
-    await supabase.auth.signOut();
-  } catch {
-    // ignore
-  }
-  try {
-    await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
-  } catch {
-    // ignore
-  }
 }

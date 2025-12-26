@@ -20,7 +20,7 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { EmptyState } from "@/components/empty-state"
 import { AuthGuard } from "@/lib/auth-guard"
-import { Inbox as InboxIcon, ExternalLink, Bookmark, Send, CheckCircle2, XCircle } from "lucide-react"
+import { ExternalLink, Bookmark, Send, CheckCircle2, XCircle } from "lucide-react"
 import type { DigestItem, DigestRow } from "@/lib/types-extended"
 import { JobTrackerModal } from "@/components/job-tracker-modal"
 import { supabaseBrowser } from "@/lib/supabase/client"
@@ -46,7 +46,6 @@ function InboxPageContent() {
 
   useEffect(() => {
     setMounted(true)
-
     ;(async () => {
       await loadDigests()
       await loadTrackerStatuses()
@@ -165,7 +164,7 @@ function InboxPageContent() {
           <Card>
             <CardContent className="p-12">
               <EmptyState
-                icon={InboxIcon}
+                icon="Inbox"
                 title="No digests yet"
                 description="Create a saved search and run it to generate your first digest"
                 action={{

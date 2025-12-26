@@ -194,7 +194,7 @@ async function probeServer(baseUrl) {
   if (res.status < 200 || res.status >= 500) return false;
   const html = await res.text().catch(() => "");
   if (html.includes(PROBE_MARKER)) return true;
-  // Fallback for older running dev servers that don't include the marker yet.
+  // Backup for older running dev servers that don't include the marker yet.
   return html.includes("App status") && html.includes("Aureo");
 }
 

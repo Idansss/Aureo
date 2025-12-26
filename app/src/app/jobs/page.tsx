@@ -17,6 +17,37 @@ import { jobRecordToManifest } from "@/lib/job-presenter"
 import type { JobRecord, Job } from "@/lib/types"
 import { formatSupabaseError, isSchemaMissingError } from "@/lib/supabase/error"
 
+function formatCurrency(code?: string | null) {
+  const c = (code ?? "USD").toUpperCase()
+  if (c === "USD") return "$"
+  if (c === "EUR") return "€"
+  if (c === "GBP") return "£"
+  if (c === "NGN") return "₦"
+  return c ? `${c} ` : ""
+}
+
+function formatSalary(min?: number | null, max?: number | null, currency?: string | null) {
+  const symbol = formatCurrency(currency)
+  if (typeof min === "number" && typeof max === "number") return `${symbol}${min.toLocaleString()} - ${symbol}${max.toLocaleString()}`
+  if (typeof min === "number") return `${symbol}${min.toLocaleString()}+`
+  if (typeof max === "number") return `Up to ${symbol}${max.toLocaleString()}`
+  return "Not disclosed"
+}
+
+function inferTagsFromTitle(title: string) {
+  const t = title.toLowerCase()
+  if (t.includes("designer") || t.includes("design")) return ["Design"]
+  if (t.includes("engineer") || t.includes("frontend") || t.includes("backend")) return ["Engineering"]
+  if (t.includes("product")) return ["Product"]
+  if (t.includes("ops") || t.includes("operations")) return ["Operations"]
+  return []
+}
+
+function hoursToDaysString(hours: number | null) {
+  if (!hours || !Number.isFinite(hours)) return ""
+  return String(Math.max(0.5, Math.round((hours / 24) * 10) / 10))
+}
+
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [draftQuery, setDraftQuery] = useState("")
@@ -289,9 +320,9 @@ export default function JobsPage() {
 
                   {/* Jobs Grid */}
                   <div className="grid gap-6">
-                    {pagedJobs.map((job) => (
-                      <JobCard key={job.id} job={job} />
-                    ))}
+                    {pagedJobs.map((job) => {
+                      return <JobCard key={job.id} job={job} />
+                    })}
                   </div>
 
             {/* Pagination */}

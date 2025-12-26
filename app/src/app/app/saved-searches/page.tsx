@@ -12,7 +12,7 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { EmptyState } from "@/components/empty-state"
 import { AuthGuard } from "@/lib/auth-guard"
-import { Search, Plus, Clock, Bell, Edit, Trash2, Play } from "lucide-react"
+import { Plus, Clock, Bell, Edit, Trash2, Play } from "lucide-react"
 import { toast } from "sonner"
 import type { SavedSearch } from "@/lib/types-extended"
 import { supabaseBrowser } from "@/lib/supabase/client"
@@ -151,7 +151,7 @@ function SavedSearchesPageContent() {
           <Card>
             <CardContent className="p-12">
               <EmptyState
-                icon={Search}
+                icon="Search"
                 title="No saved searches"
                 description="Create your first saved search to get job alerts delivered to your inbox"
                 action={{

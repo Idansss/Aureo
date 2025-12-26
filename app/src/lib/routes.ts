@@ -31,13 +31,13 @@ export const routes = {
     saved: "/app/saved",
   },
   dashboard: {
-    employer: "/dashboard/employer",
+    employer: "/employer",
   },
   employer: {
-    dashboard: "/dashboard/employer",
-    jobs: "/dashboard/employer/jobs",
-    pipeline: (id: string) => `/dashboard/employer/jobs/${id}`,
-    createJob: "/dashboard/employer/jobs/new",
+    dashboard: "/employer",
+    jobs: "/employer/jobs",
+    pipeline: (id: string) => `/employer/jobs/${id}`,
+    createJob: "/employer/jobs/new",
   },
   admin: {
     reports: "/admin/reports",

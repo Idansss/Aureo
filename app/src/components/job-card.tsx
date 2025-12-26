@@ -12,9 +12,11 @@ import Link from "next/link"
 
 interface JobCardProps {
   job: Job
+  jobStatus?: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED" | "FILLED"
 }
 
-export function JobCard({ job }: JobCardProps) {
+export function JobCard({ job, jobStatus }: JobCardProps) {
+  const disabledApply = jobStatus === "FILLED" || jobStatus === "CLOSED" || jobStatus === "PAUSED"
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
@@ -26,6 +28,11 @@ export function JobCard({ job }: JobCardProps) {
                 <TrendingUp className="h-3 w-3 mr-1" />
                 {job.trustScore}% Trust
               </Badge>
+              {jobStatus && jobStatus !== "ACTIVE" ? (
+                <Badge variant="outline" className="text-xs">
+                  {jobStatus.toLowerCase()}
+                </Badge>
+              ) : null}
             </div>
             <CardTitle className="text-xl">
               <Link href={`/jobs/${job.id}`} className="hover:text-primary transition-colors">
@@ -85,8 +92,17 @@ export function JobCard({ job }: JobCardProps) {
             <Button variant="outline" size="sm" asChild className="shrink-0">
               <Link href={`/jobs/${job.id}`}>View Details</Link>
             </Button>
-            <Button size="sm" variant="primary" asChild className="shrink-0">
-              <Link href={`/jobs/${job.id}?apply=1`}>Apply Now</Link>
+            <Button size="sm" variant="primary" asChild className="shrink-0" disabled={disabledApply}>
+              <Link
+                href={`/jobs/${job.id}?apply=1`}
+                aria-disabled={disabledApply}
+                onClick={(e) => {
+                  if (!disabledApply) return
+                  e.preventDefault()
+                }}
+              >
+                {jobStatus === "FILLED" ? "Filled" : jobStatus === "CLOSED" ? "Closed" : jobStatus === "PAUSED" ? "Paused" : "Apply Now"}
+              </Link>
             </Button>
           </div>
         </div>

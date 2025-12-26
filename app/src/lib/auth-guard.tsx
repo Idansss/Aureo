@@ -46,7 +46,7 @@ export function AuthGuard({ children, requiredRole, redirectTo }: AuthGuardProps
       setRole(resolvedRole)
 
       if (requiredRole && resolvedRole && resolvedRole !== requiredRole) {
-        router.push(resolvedRole === "employer" ? "/dashboard/employer" : "/app")
+        router.push(resolvedRole === "employer" ? "/employer" : "/app")
       }
     }
 
@@ -87,5 +87,3 @@ export function AuthGuard({ children, requiredRole, redirectTo }: AuthGuardProps
 
   return <>{children}</>
 }
-
-

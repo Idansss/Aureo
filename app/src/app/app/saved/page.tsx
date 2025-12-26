@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Container } from "@/components/container"
 import { PageHeader } from "@/components/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,12 +44,12 @@ import {
 export default function SavedJobsPage() {
   return (
     <AuthGuard requiredRole="seeker">
-      <SavedJobsPageContent />
+      <SupabaseSavedJobsPageContent />
     </AuthGuard>
   )
 }
 
-function SavedJobsPageContent() {
+function SupabaseSavedJobsPageContent() {
   const [activeTab, setActiveTab] = useState("jobs")
   const [savedJobs, setSavedJobs] = useState<Array<{ id: string; folder_id: string | null; job: JobRecord }>>([])
   const [folders, setFolders] = useState<any[]>([])
@@ -57,14 +58,17 @@ function SavedJobsPageContent() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     setMounted(true)
+    const qp = searchParams.get("tab")
+    if (qp) setActiveTab(qp)
     loadSavedJobs()
     loadFolders()
     loadAlerts()
     loadReminders()
-  }, [])
+  }, [searchParams])
 
   const loadSavedJobs = async () => {
     const result = await listSavedJobs()

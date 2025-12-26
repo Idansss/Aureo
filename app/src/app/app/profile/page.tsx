@@ -8,7 +8,6 @@ import { getServerUser } from "@/lib/auth-server"
 import { ProfileDetailsForm } from "./profile-form"
 import { AssetUploadForm } from "./upload-form"
 import { PortfolioManager } from "./portfolio-manager"
-
 export default async function ProfilePage() {
   const user = await getServerUser()
   if (!user) redirect("/auth/login")

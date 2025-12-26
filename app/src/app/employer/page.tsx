@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation"
+import { redirect } from "next/navigation";
 
-export default function EmployerRootPage() {
-  redirect("/dashboard/employer")
+export default function EmployerPage() {
+  redirect("/dashboard/employer");
 }
 
 

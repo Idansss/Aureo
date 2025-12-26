@@ -32,6 +32,8 @@ type EditValues = z.infer<typeof EditSchema>
 
 export default function EditEmployerJobPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const id = params.id
+
   const [loading, setLoading] = React.useState(true)
   const [remote, setRemote] = React.useState(false)
   const [active, setActive] = React.useState(true)

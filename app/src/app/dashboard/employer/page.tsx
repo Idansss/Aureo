@@ -6,6 +6,7 @@ import { StatCard } from "@/components/stat-card"
 import { Button } from "@/components/ui/button"
 import { supabaseServer } from "@/lib/supabase/server"
 import { getServerUser } from "@/lib/auth-server"
+import { CompanySetup } from "./company-setup"
 
 export default async function EmployerDashboardPage() {
   const user = await getServerUser()
@@ -15,12 +16,23 @@ export default async function EmployerDashboardPage() {
 
   const { data: membership } = await supabase
     .from("company_members")
-    .select("company_id, companies(name)")
+    .select("company_id, companies(*)")
     .eq("user_id", user.id)
     .maybeSingle()
 
   const companyId = (membership as any)?.company_id as string | undefined
-  const companyName = String((membership as any)?.companies?.name ?? "")
+  const company = (membership as any)?.companies ?? null
+  const companyName = String(company?.name ?? "")
+  const avgHours = typeof company?.avg_response_time_hours === "number" ? company.avg_response_time_hours : null
+  const responseRate = typeof company?.response_rate === "number" ? company.response_rate : null
+  const responseHealth =
+    avgHours == null
+      ? "—"
+      : avgHours <= 48
+        ? "Strong"
+        : avgHours <= 72
+          ? "OK"
+          : "Needs work"
 
   if (!companyId) {
     return (
@@ -34,9 +46,7 @@ export default async function EmployerDashboardPage() {
             </Button>
           }
         />
-        <div className="rounded-[var(--radius)] border border-border bg-muted p-8 text-sm text-muted-foreground">
-          You don’t have a company workspace yet. Join or create a company before posting jobs.
-        </div>
+        <CompanySetup />
       </div>
     )
   }
@@ -95,8 +105,12 @@ export default async function EmployerDashboardPage() {
         />
         <StatCard
           title="Response health"
-          value="—"
-          description="Coming from real metrics soon"
+          value={responseHealth}
+          description={
+            avgHours == null
+              ? "No response-time samples yet"
+              : `Avg first response: ${(avgHours / 24).toFixed(1)}d${responseRate != null ? ` • ${responseRate}% response rate` : ""}`
+          }
           icon={BarChart3}
         />
       </div>

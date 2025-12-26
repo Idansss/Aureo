@@ -13,14 +13,16 @@ import { JobCard } from "@/components/job-card"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Search, ShieldCheck, Zap, Target, Clock, Users, Star } from "lucide-react"
-import { useAuth } from "@/lib/use-auth"
+import { useViewer } from "@/lib/use-viewer"
 import { supabaseBrowser } from "@/lib/supabase/client"
 import { jobRecordToManifest } from "@/lib/job-presenter"
 import type { JobRecord, Job } from "@/lib/types"
 import { formatSupabaseError, isSchemaMissingError } from "@/lib/supabase/error"
 
 export default function HomePage() {
-  const { isAuthenticated, user } = useAuth()
+  const viewer = useViewer()
+  const isAuthenticated = viewer.isAuthenticated
+  const user = viewer.user
   const [mounted, setMounted] = useState(false)
   const [featuredJobs, setFeaturedJobs] = useState<Job[]>([])
   const [metrics, setMetrics] = useState<{
@@ -41,10 +43,153 @@ export default function HomePage() {
       initials: string
     }>
   >([])
+  const [candidateSnapshot, setCandidateSnapshot] = useState<{
+    name: string
+    headline: string
+    trustScore: number
+    activeApplications: number | null
+    skills: string[]
+    isVerified: boolean
+    initials: string
+    mode: "me" | "public"
+  } | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    const supabase = supabaseBrowser()
+
+    const toInitials = (name: string) => {
+      const parts = name.trim().split(/\s+/).filter(Boolean)
+      const letters = (parts.length >= 2 ? [parts[0][0], parts[1][0]] : [parts[0]?.[0] ?? "A"]).join("")
+      return letters.toUpperCase().slice(0, 2)
+    }
+
+    const computeTrustScore = (p: any) => {
+      let score = 0
+      if (p?.full_name || p?.username || p?.fullName) score += 15
+      if (p?.headline) score += 15
+      if (p?.location) score += 10
+      if (p?.bio) score += 15
+      if (p?.cv_url || p?.cvUrl) score += 10
+      const skills = Array.isArray(p?.skills) ? p.skills : []
+      if (skills.length >= 3) score += 20
+      const links = p?.links && typeof p.links === "object" ? p.links : {}
+      if (Object.values(links).some(Boolean)) score += 15
+      return Math.min(100, Math.max(0, score))
+    }
+
+    const normalizeSkills = (skillsRaw: any) => {
+      const skills = Array.isArray(skillsRaw) ? skillsRaw.map(String).filter(Boolean) : []
+      return skills.slice(0, 4)
+    }
+
+    const loadMySnapshot = async (userId: string) => {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name, username, headline, location, bio, cv_url, skills, links")
+        .eq("id", userId)
+        .maybeSingle()
+
+      if (profileError) {
+        const meta = formatSupabaseError(profileError)
+        console.error("Failed to load profile snapshot:", meta, profileError)
+        return
+      }
+
+      const { count: appsCount, error: appsError } = await supabase
+        .from("applications")
+        .select("id", { head: true, count: "exact" })
+        .eq("user_id", userId)
+        .in("status", ["applied", "screening", "interview", "offer"] as any)
+
+      if (appsError) {
+        const meta = formatSupabaseError(appsError)
+        console.error("Failed to load applications count:", meta, appsError)
+      }
+
+      const name = String(profile?.full_name || profile?.username || user?.fullName || "Your profile")
+      const headline = String(profile?.headline || "Complete your profile to improve matching")
+      const trustScore = computeTrustScore(profile)
+      const isVerified = trustScore >= 90
+
+      setCandidateSnapshot({
+        name,
+        headline,
+        trustScore,
+        activeApplications: typeof appsCount === "number" ? appsCount : 0,
+        skills: normalizeSkills(profile?.skills),
+        isVerified,
+        initials: toInitials(name),
+        mode: "me",
+      })
+    }
+
+    const loadPublicSnapshot = async () => {
+      // Prefer latest public seeker profile. If extra columns don't exist yet, fall back gracefully.
+      const tryQuery = async (includePublicFlag: boolean) => {
+        let q = supabase
+          .from("profiles")
+          .select("id, full_name, username, headline, location, bio, cv_url, skills, links, role" + (includePublicFlag ? ", is_public" : ""))
+          .eq("role", "seeker" as any)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+
+        if (includePublicFlag) q = q.eq("is_public", true as any)
+
+        return await q.maybeSingle()
+      }
+
+      let data: any = null
+      let error: any = null
+      ;({ data, error } = await tryQuery(true))
+      if (error) {
+        // If is_public column isn't available yet, fall back.
+        ;({ data, error } = await tryQuery(false))
+      }
+
+      if (error) {
+        const meta = formatSupabaseError(error)
+        console.error("Failed to load public snapshot:", meta, error)
+        return
+      }
+
+      if (!data) {
+        setCandidateSnapshot(null)
+        return
+      }
+
+      const name = String(data.full_name || data.username || "Aureo member")
+      const headline = String(data.headline || "Job seeker")
+      const trustScore = computeTrustScore(data)
+      const isVerified = trustScore >= 90
+
+      setCandidateSnapshot({
+        name,
+        headline,
+        trustScore,
+        activeApplications: null,
+        skills: normalizeSkills(data.skills),
+        isVerified,
+        initials: toInitials(name),
+        mode: "public",
+      })
+    }
+
+    const load = async () => {
+      if (isAuthenticated && user?.id) {
+        await loadMySnapshot(user.id)
+        return
+      }
+      await loadPublicSnapshot()
+    }
+
+    load()
+    const id = window.setInterval(load, 60_000)
+    return () => window.clearInterval(id)
+  }, [isAuthenticated, user?.id, user?.fullName])
 
   useEffect(() => {
     const supabase = supabaseBrowser()
@@ -145,7 +290,7 @@ export default function HomePage() {
 
   const dashboardHref = useMemo(() => {
     if (!isAuthenticated || !user) return "/auth/register"
-    return user.role === "employer" ? "/dashboard/employer" : "/app"
+    return user.role === "employer" ? "/employer" : "/app"
   }, [isAuthenticated, user])
 
   return (
@@ -186,35 +331,48 @@ export default function HomePage() {
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-start gap-4">
                   <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
-                    SK
+                    {candidateSnapshot?.initials ?? "AU"}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold">Sarah Kim</h3>
-                      <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">
-                        <ShieldCheck className="h-3 w-3 mr-1" />
-                        Verified
-                      </Badge>
+                      <h3 className="font-semibold">{candidateSnapshot?.name ?? "Candidate snapshot"}</h3>
+                      {candidateSnapshot?.isVerified ? (
+                        <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      ) : null}
                     </div>
-                    <p className="text-sm text-muted-foreground">Senior Product Designer</p>
+                    <p className="text-sm text-muted-foreground">{candidateSnapshot?.headline ?? "—"}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 py-4 border-y">
                   <div>
-                    <p className="text-2xl font-semibold text-primary">94%</p>
+                    <p className="text-2xl font-semibold text-primary">
+                      {candidateSnapshot ? `${candidateSnapshot.trustScore}%` : "—"}
+                    </p>
                     <p className="text-xs text-muted-foreground">Trust Score</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-semibold">5</p>
-                    <p className="text-xs text-muted-foreground">Active Applications</p>
+                    {candidateSnapshot?.activeApplications != null ? (
+                      <>
+                        <p className="text-2xl font-semibold">{candidateSnapshot.activeApplications}</p>
+                        <p className="text-xs text-muted-foreground">Active Applications</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-semibold">{candidateSnapshot ? candidateSnapshot.skills.length : "—"}</p>
+                        <p className="text-xs text-muted-foreground">Skills Listed</p>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Top Skills</p>
                   <div className="flex flex-wrap gap-2">
-                    {["Figma", "UI/UX", "Design Systems", "Prototyping"].map((skill) => (
+                    {(candidateSnapshot?.skills?.length ? candidateSnapshot.skills : ["—"]).map((skill) => (
                       <Badge key={skill} variant="subtle" className="text-xs">
                         {skill}
                       </Badge>
@@ -223,7 +381,7 @@ export default function HomePage() {
                 </div>
 
                 <Button variant="primary" className="w-full" asChild>
-                  <Link href={dashboardHref}>View Full Profile</Link>
+                  <Link href={candidateSnapshot?.mode === "me" ? dashboardHref : "/auth/register"}>View Full Profile</Link>
                 </Button>
               </CardContent>
             </Card>

@@ -6,6 +6,8 @@ import { getServerUser } from "@/lib/auth-server";
 
 const ApplySchema = z.object({
   jobId: z.string().min(1),
+  portfolioUrl: z.string().url().optional(),
+  notes: z.string().max(5000).optional(),
 });
 
 const ReportSchema = z.object({
@@ -27,6 +29,8 @@ export async function applyToJob(input: z.infer<typeof ApplySchema>) {
   const { error } = await supabase.from("applications").insert({
     job_id: parsed.data.jobId,
     user_id: user.id,
+    resume_url: parsed.data.portfolioUrl ?? null,
+    cover_letter: parsed.data.notes ?? null,
   });
 
   if (error) {

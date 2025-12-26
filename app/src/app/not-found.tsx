@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link";
-import { SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 
 export default function NotFound() {
@@ -10,7 +9,7 @@ export default function NotFound() {
       <EmptyState
         title="Page not found"
         description="This route does not exist. Use the navigation to get back to a known page."
-        icon={SearchX}
+        icon="SearchX"
         action={{ label: "Go home", href: "/" }}
       />
       <p className="mt-6 text-center text-sm text-muted-foreground">

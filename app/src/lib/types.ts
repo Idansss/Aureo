@@ -65,7 +65,7 @@ export interface ProfileRecord {
 // Types for manifest files
 export interface Application {
   id: string;
-  status: "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn";
+  status: "applied" | "screening" | "shortlisted" | "interview" | "offer" | "hired" | "rejected" | "withdrawn";
   appliedAt: string;
   job: {
     id: string;

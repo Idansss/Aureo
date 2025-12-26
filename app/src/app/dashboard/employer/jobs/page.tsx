@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,8 @@ type Filters = {
 }
 
 export default function EmployerJobsDashboardPage() {
+  const router = useRouter()
+
   const [jobs, setJobs] = React.useState<JobRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [filters, setFilters] = React.useState<Filters>({

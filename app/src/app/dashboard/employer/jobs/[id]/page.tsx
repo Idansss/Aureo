@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,7 +41,9 @@ type ApplicantRow = {
 }
 
 export default function EmployerJobDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter()
   const id = params.id
+
   const [job, setJob] = React.useState<JobRow | null>(null)
   const [apps, setApps] = React.useState<ApplicantRow[]>([])
   const [loading, setLoading] = React.useState(true)

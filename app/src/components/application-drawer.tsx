@@ -125,7 +125,7 @@ export function ApplicationDrawer({ application, open, onOpenChange }: Applicati
                 View Job Details
               </Link>
             </Button>
-            <Button variant="outline" className="w-full" onClick={() => setWithdrawOpen(true)}>
+            <Button variant="outline" className="w-full" onClick={() => setWithdrawOpen(true)} disabled={pending}>
               Withdraw Application
             </Button>
           </div>

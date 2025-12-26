@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarImage, AvatarPlaceholder } from "@/components/ui/avatar"
 import { TrustBadge } from "@/components/trust-badge"
 import { cn } from "@/lib/utils"
 
@@ -28,7 +28,7 @@ export function CompanyBadge({ name, logo, verified = false, className, size = "
     <div className={cn("flex items-center gap-2", className)}>
       <Avatar className={sizeClasses[size]}>
         {logo && <AvatarImage src={logo || "/placeholder.svg"} alt={name} />}
-        <AvatarFallback className="bg-muted text-muted-foreground font-medium">{initials}</AvatarFallback>
+        <AvatarPlaceholder className="bg-muted text-muted-foreground font-medium">{initials}</AvatarPlaceholder>
       </Avatar>
       <div className="flex items-center gap-1.5">
         <span className={cn("font-medium", size === "sm" && "text-sm")}>{name}</span>

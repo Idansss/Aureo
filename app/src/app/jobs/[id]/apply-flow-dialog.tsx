@@ -155,7 +155,11 @@ export function ApplyFlowDialog({
         return;
       }
 
-      const result = await applyToJob({ jobId });
+      const result = await applyToJob({
+        jobId,
+        portfolioUrl: portfolioUrl.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
       if (result.ok) {
         toast.success(result.message, {
           action: {
