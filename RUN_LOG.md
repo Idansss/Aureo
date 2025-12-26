@@ -1,0 +1,247 @@
+# Aureo Employer OS — RUN_LOG
+
+This file is the single source of truth for the implementation checklist and progress.
+
+## Execution plan (strict order)
+
+- [x] **1) Scan repository + inventory existing employer routes/components**
+  - **Findings**
+    - Existing employer routes are split across:
+      - **Legacy-ish**: `/dashboard/employer/*` (jobs CRUD + pipeline + create company workspace)
+      - **Stub**: `/employer/*` currently redirects to `/dashboard/employer`
+    - Middleware currently treats `/employer` as an “app area” and redirects unauthenticated users to `/auth/login` (conflicts with demo mode requirement).
+    - No full employer workflow pages exist yet under `/employer/*` (company/applicants/messages/interviews/offers/team/settings/trust/analytics).
+  - **Relevant paths found**
+    - `app/src/app/dashboard/employer/page.tsx`
+    - `app/src/app/dashboard/employer/jobs/*`
+    - `app/src/app/employer/*` (redirects)
+    - `app/src/components/stat-card.tsx`, `app/src/components/ui/*`
+    - `app/proxy.ts` (middleware auth redirect)
+
+- [x] **2) Create missing `/employer` routes + shared layout (sidebar + header)**
+  - **What shipped**
+    - Added `/employer` area layout with sidebar navigation.
+    - Added all required `/employer/*` routes as working pages or temporary redirects (no 404/dead nav).
+    - Updated global navigation to point employers to `/employer`.
+    - Demo-mode support: middleware auth redirects are bypassed when `NEXT_PUBLIC_DEMO_MODE=true`.
+  - **Files touched**
+    - `app/src/app/employer/layout.tsx`
+    - `app/src/components/employer/employer-shell.tsx`
+    - `app/src/components/employer/employer-dashboard.tsx`
+    - `app/src/app/employer/page.tsx`
+    - `app/src/app/employer/dashboard/page.tsx` (alias redirect)
+    - `app/src/app/employer/company/page.tsx`
+    - `app/src/app/employer/jobs/page.tsx` (temporary redirect)
+    - `app/src/app/employer/jobs/new/page.tsx` (temporary redirect)
+    - `app/src/app/employer/jobs/[id]/page.tsx` (temporary redirect)
+    - `app/src/app/employer/applicants/page.tsx`
+    - `app/src/app/employer/applicants/[id]/page.tsx`
+    - `app/src/app/employer/messages/page.tsx`
+    - `app/src/app/employer/interviews/page.tsx`
+    - `app/src/app/employer/offers/page.tsx`
+    - `app/src/app/employer/team/page.tsx`
+    - `app/src/app/employer/settings/page.tsx`
+    - `app/src/app/employer/trust/page.tsx`
+    - `app/src/app/employer/analytics/page.tsx`
+    - `app/src/app/employer/analytics/messaging/page.tsx`
+    - `app/src/lib/routes.ts`
+    - `app/src/components/navbar.tsx`
+    - `app/src/components/footer.tsx`
+    - `app/src/components/command-palette.tsx`
+    - `app/proxy.ts`
+    - `app/src/lib/demo-mode.ts`
+- [x] **3) Implement demo data layer (`app/src/lib/demo-store.ts`) + seed data**
+  - **What shipped**
+    - Central demo-store with typed models and helpers for:
+      - `employerCompany`, `employerJobs`, `employerApplicants`, `employerMessages`, `employerInterviews`, `employerOffers`, `employerAudit`
+    - Automatic seed on first load (1 company, 3 jobs, 10 applicants, 3 threads, 1 interview, 1 offer, audit entries).
+    - Reactive updates via `useSyncExternalStore` + internal emitter (single source of truth).
+    - Employer dashboard now reads live demo-store counts instead of hard-coded placeholders.
+  - **Files touched**
+    - `app/src/lib/demo-store.ts`
+    - `app/src/components/employer/employer-dashboard.tsx`
+- [x] **4) Jobs CRUD + wire all CTAs**
+  - **What shipped**
+    - `/employer/jobs` real jobs management (tabs + filters + per-job stats).
+    - Actions wired in demo-store: Create, Edit, Duplicate, Pause, Activate, Close, Mark filled.
+    - `/employer/jobs/new` multi-step job wizard with templates + preview before publish.
+    - `/employer/jobs/[id]` job admin view with editor + status actions + pipeline snapshot.
+  - **Files touched**
+    - `app/src/app/employer/jobs/page.tsx`
+    - `app/src/app/employer/jobs/new/page.tsx`
+    - `app/src/app/employer/jobs/[id]/page.tsx`
+    - `app/src/lib/demo-mode.ts`
+    - `app/proxy.ts`
+- [x] **5) Pipeline Kanban (drag/drop) + hired→prompt mark filled**
+  - **What shipped**
+    - Per-job pipeline Kanban with HTML5 drag/drop for stages:
+      - New → Shortlisted → Interview → Offer → Hired → Rejected
+    - Dragging a candidate to **Hired** triggers prompt: **“Mark role filled?”**
+      - Yes → job status set to `FILLED` and badge updates everywhere.
+    - Stage moves are persisted to demo-store + logged to audit.
+  - **Files touched**
+    - `app/src/components/employer/pipeline-kanban.tsx`
+    - `app/src/app/employer/jobs/[id]/page.tsx`
+    - `app/src/lib/demo-store.ts`
+- [x] **6) Applicants inbox + applicant profile**
+  - **What shipped**
+    - `/employer/applicants` inbox with filters (job, stage, score, location, skills) and bulk actions.
+    - Row actions: open profile, message link, stage change dropdown.
+    - `/employer/applicants/[id]` profile view with:
+      - Stage control, skills, links, employer rating + internal notes
+      - Timeline derived from audit + messages + interviews + offers
+  - **Files touched**
+    - `app/src/app/employer/applicants/page.tsx`
+    - `app/src/app/employer/applicants/[id]/page.tsx`
+- [x] **7) Messaging center + templates**
+  - **What shipped**
+    - `/employer/messages` messaging center:
+      - Thread list + search
+      - Chat view + composer
+      - Templates: interview invite / portfolio request / rejection
+      - Actions from chat: move stage, schedule interview (navigate), make offer (navigate)
+      - Supports deep-linking via `?applicantId=...` or `?threadId=...`
+    - Moving stage to **HIRED** from chat prompts **mark role filled**.
+  - **Files touched**
+    - `app/src/app/employer/messages/page.tsx`
+- [x] **8) Interviews + Offers scaffolds with real state changes**
+  - **What shipped**
+    - `/employer/interviews`:
+      - Schedule/edit interviews (date/time picker, type, panel, notes)
+      - Mark complete/cancel
+      - Prefill via `?applicantId=...`
+    - `/employer/offers`:
+      - Draft/edit/send offers
+      - Accept/decline offers
+      - Accept → candidate set to `HIRED` and prompt to **mark role filled**
+      - Prefill via `?applicantId=...`
+    - Demo-store extended with offer/interview update helpers.
+  - **Files touched**
+    - `app/src/app/employer/interviews/page.tsx`
+    - `app/src/app/employer/offers/page.tsx`
+    - `app/src/lib/demo-store.ts`
+- [x] **9) Company profile + verification scaffold**
+  - **What shipped**
+    - `/employer/company` company profile management:
+      - Company info, logo URL, website, description
+      - Locations + benefits tag editors
+      - Culture gallery URL list
+    - Verification scaffold:
+      - Proof links (label + URL) stored in demo-store
+      - Status display (unverified/pending/verified)
+  - **Files touched**
+    - `app/src/app/employer/company/page.tsx`
+    - `app/src/lib/demo-store.ts`
+- [x] **10) Team + Settings scaffolds**
+  - **What shipped**
+    - `/employer/team` team management:
+      - Add member (name/email/role)
+      - Change role (with guard to keep at least 1 Owner)
+      - Remove member (with guard to keep at least 1 Owner)
+    - `/employer/settings` employer settings:
+      - Notification toggles
+      - Editable message templates (stored in demo-store)
+      - Workflow stages scaffold
+      - Security placeholders (disabled controls + guidance)
+    - Messaging templates now use employer settings overrides.
+  - **Files touched**
+    - `app/src/app/employer/team/page.tsx`
+    - `app/src/app/employer/settings/page.tsx`
+    - `app/src/app/employer/messages/page.tsx`
+    - `app/src/lib/demo-store.ts`
+- [x] **11) Trust + Audit log pages (and wire audit logging)**
+  - **What shipped**
+    - `/employer/trust` trust center:
+      - Trust score panel (demo heuristic)
+      - Audit trail with filters + CSV export
+      - Links to verification and reports inbox
+    - Job admin now shows a **Recent audit** panel scoped to that job + its candidates.
+    - Demo-store now logs company/team/settings changes via `company.update` audit entries.
+  - **Files touched**
+    - `app/src/app/employer/trust/page.tsx`
+    - `app/src/app/employer/jobs/[id]/page.tsx`
+    - `app/src/lib/demo-store.ts`
+- [x] **12) Analytics dashboard**
+  - **What shipped**
+    - `/employer/analytics` analytics dashboard:
+      - Views, applies, conversion
+      - Pipeline funnel + hiring health (response time/rate, time-to-hire heuristic)
+      - Per-job metrics table
+    - `/employer/analytics/messaging` messaging analytics:
+      - Conversations, employer message volume
+      - Avg/median reply time and 24h SLA (computed from thread message sequence)
+      - Per-job breakdown table
+  - **Files touched**
+    - `app/src/app/employer/analytics/page.tsx`
+    - `app/src/app/employer/analytics/messaging/page.tsx`
+- [x] **13) Button audit (no dead clicks)**
+  - **What shipped**
+    - Added a lightweight static CTA audit script for the employer area.
+    - Confirms no obviously dead `<Button>` / `<button>` usage in `src/app/employer` + `src/components/employer`.
+  - **How to run**
+    - `npm run audit:employer` (inside `app/`)
+  - **Files touched**
+    - `app/scripts/audit-employer-ctas.mjs`
+    - `app/package.json`
+
+- [x] **14) Smoke test/script for key employer routes**
+  - **What shipped**
+    - Added an employer smoke script that asserts key employer routes + components exist.
+  - **How to run**
+    - `npm run smoke:employer` (inside `app/`)
+  - **Files touched**
+    - `app/scripts/smoke-employer-routes.mjs`
+    - `app/package.json`
+
+## Notes
+- Demo mode must allow employer workflow without auth redirects.
+- Non-demo mode will progressively switch to Supabase-backed calls where tables exist.
+
+## Sync rollout (Employer ⇄ Seeker unified demo store)
+
+- [x] **15) Introduce unified demo store + cross-tab events (single source of truth)**
+  - **What shipped**
+    - Created shared store types and a thin store facade for demo mode.
+    - Upgraded demo store to support seeker data + cross-tab updates:
+      - BroadcastChannel(`aureo`) + storage-event fallback
+      - Emits events on job/app/app-stage/saved/alerts changes
+  - **Files touched**
+    - `app/src/lib/store/types.ts`
+    - `app/src/lib/store/events.ts`
+    - `app/src/lib/store/index.ts`
+    - `app/src/lib/demo-store.ts`
+
+- [x] **16) Wire seeker job discovery + job page lifecycle states to demo store**
+  - **What shipped**
+    - `/jobs` uses unified demo store in demo mode and only shows ACTIVE jobs (excludes paused/closed/filled).
+    - Job cards and job detail now reflect lifecycle states (Filled/Closed/Paused) and block Apply.
+    - Apply flow in demo mode writes an application into the same store that employer pipeline reads.
+  - **Files touched**
+    - `app/src/app/jobs/page.tsx`
+    - `app/src/components/job-card.tsx`
+    - `app/src/app/jobs/[id]/page.tsx`
+    - `app/src/app/jobs/[id]/apply-button.tsx`
+    - `app/src/app/jobs/[id]/apply-flow-dialog.tsx`
+
+- [x] **17) Wire seeker applications + saved + alerts in demo mode**
+  - **What shipped**
+    - `/app/applications` renders from unified store in demo mode, mapping pipeline stages → seeker statuses.
+    - `/app/saved` has a demo-mode UI for Saved Jobs + Alerts (read/unread).
+    - `/alerts` becomes a real alerts list in demo mode (otherwise redirects to Saved alerts tab).
+    - Navbar shows an Alerts link and unread count in demo mode.
+    - Matching engine creates “New role posted” alerts on publish, and status-change alerts for saved/applied roles.
+    - Stage changes by employer generate seeker alerts.
+  - **Files touched**
+    - `app/src/app/app/applications/page.tsx`
+    - `app/src/app/app/saved/page.tsx`
+    - `app/src/app/alerts/page.tsx`
+    - `app/src/components/navbar.tsx`
+    - `app/src/components/save-job-cta-button.tsx`
+    - `app/src/lib/auth-guard.tsx`
+    - `app/src/lib/types.ts`
+    - `app/src/components/application-drawer.tsx`
+
+## Latest work
+- Updated the shared `Navbar` to honor `useAuth().ready`, show authenticated actions (notifications, dashboard, profile/settings/logout), and keep mobile navigation in sync with the single header.
+- Extended `useAuth` so the header can rely on one auth source in both real and demo modes while avoiding flicker by exposing a ready flag.
+

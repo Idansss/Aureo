@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Container } from "@/components/container"
-import { Briefcase, Menu, LogOut, User } from "lucide-react"
+import { Briefcase, Menu, LogOut, User, Bell, Settings } from "lucide-react"
 import { IconBadge } from "@/components/ui/icon-badge"
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useAuth, signOut } from "@/lib/use-auth"
@@ -19,12 +19,24 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useSettings } from "@/components/settings/settings-provider"
+import { isDemoMode } from "@/lib/demo-mode"
+import { Badge } from "@/components/ui/badge"
+import { getActiveSeekerId, useStoreSnapshot } from "@/lib/store"
+import { routes } from "@/lib/routes"
 
 export function Navbar() {
   const router = useRouter()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, ready } = useAuth()
   const { settings } = useSettings()
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const demo = isDemoMode()
+  const snap = useStoreSnapshot()
+  const isReadyAndAuthed = ready && isAuthenticated && Boolean(user)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined" || !user) return
@@ -36,17 +48,28 @@ export function Navbar() {
     signOut().finally(() => router.push("/"))
   }
 
-  const isLoggedIn = isAuthenticated
+  const isLoggedIn = ready && isAuthenticated
+
+  const showSeekerNav = useMemo(() => {
+    if (isLoggedIn && user) return user.role !== "employer"
+    return demo
+  }, [demo, isLoggedIn, user])
+
+  const unreadAlerts = useMemo(() => {
+    if (!demo || !mounted) return 0
+    const seekerId = getActiveSeekerId()
+    return (snap?.alerts ?? []).filter((a) => a.seekerId === seekerId && !a.readAt).length
+  }, [demo, mounted, snap?.alerts])
 
   const dashboardHref = useMemo(() => {
-    if (!isLoggedIn || !user) return null
-    return user.role === "employer" ? "/dashboard/employer" : "/app"
-  }, [isLoggedIn, user])
+    if (user?.role === "employer") return routes.employer.dashboard
+    return routes.app.dashboard
+  }, [user?.role])
 
   const profileHref = useMemo(() => {
-    if (!isLoggedIn || !user) return null
-    return user.role === "employer" ? "/dashboard/employer" : "/app/profile"
-  }, [isLoggedIn, user])
+    if (user?.role === "employer") return routes.employer.dashboard
+    return routes.app.profile
+  }, [user?.role])
   
   // Use username from settings, or fallback to user.name
   const displayName = useMemo(() => {
@@ -86,13 +109,17 @@ export function Navbar() {
             </Link>
             {isLoggedIn && user ? (
               user.role === "employer" ? (
-                <Link href="/dashboard/employer" className="text-sm font-medium hover:text-primary transition-colors">
+                <Link href="/employer" className="text-sm font-medium hover:text-primary transition-colors">
                   Dashboard
                 </Link>
               ) : (
                 <>
                   <Link href="/app" className="text-sm font-medium hover:text-primary transition-colors">
                     Dashboard
+                  </Link>
+                  <Link href="/alerts" className="text-sm font-medium hover:text-primary transition-colors inline-flex items-center gap-2">
+                    Alerts
+                    {demo && unreadAlerts ? <Badge variant="accent">{unreadAlerts}</Badge> : null}
                   </Link>
                   <Link href="/app/saved" className="text-sm font-medium hover:text-primary transition-colors">
                     Saved Jobs
@@ -106,76 +133,101 @@ export function Navbar() {
                 </>
               )
             ) : (
-              <Link href="/dashboard/employer" className="text-sm font-medium hover:text-primary transition-colors">
-                For Employers
-              </Link>
+              <>
+                {showSeekerNav ? (
+                  <Link href="/alerts" className="text-sm font-medium hover:text-primary transition-colors inline-flex items-center gap-2">
+                    Alerts
+                    {demo && unreadAlerts ? <Badge variant="accent">{unreadAlerts}</Badge> : null}
+                  </Link>
+                ) : (
+                  <Link href="/employer" className="text-sm font-medium hover:text-primary transition-colors">
+                    For Employers
+                  </Link>
+                )}
+              </>
             )}
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            {isLoggedIn && user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2">
-                    <Avatar className="h-8 w-8">
-                      {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                      <AvatarFallback>
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="hidden sm:inline">{displayName}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {user.role === "employer" ? (
-                    <DropdownMenuItem asChild>
-                      <Link 
-                        href={profileHref ?? "/"} 
-                        className="flex items-center gap-2"
+            <ThemeToggle />
+            {isReadyAndAuthed ? (
+              <>
+                <Button variant="ghost" className="relative h-10 w-10 p-0" asChild>
+                  <Link
+                    href="/alerts"
+                    aria-label="View alerts"
+                    className="flex h-full w-full items-center justify-center"
+                  >
+                    <Bell className="h-5 w-5" />
+                    {demo && unreadAlerts ? (
+                      <Badge
+                        variant="accent"
+                        className="absolute -top-1 -right-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
                       >
+                        {unreadAlerts}
+                      </Badge>
+                    ) : null}
+                  </Link>
+                </Button>
+                <Link
+                  href={dashboardHref}
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="gap-2 px-2">
+                      <Avatar className="h-8 w-8">
+                        {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                        <AvatarFallback>{userInitials}</AvatarFallback>
+                      </Avatar>
+                      <span className="hidden sm:inline">{displayName}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <div className="px-4 py-3">
+                      <p className="text-sm font-semibold">{displayName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user?.email ?? "No email"}</p>
+                      <Badge variant="outline" className="mt-2 text-[10px]">
+                        {user?.role === "employer" ? "Employer" : "Seeker"}
+                      </Badge>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href={profileHref ?? "/"} className="flex items-center gap-2">
                         <User className="h-4 w-4" />
                         Profile
                       </Link>
                     </DropdownMenuItem>
-                  ) : (
-                    <>
-                      <DropdownMenuItem asChild>
-                        <Link 
-                          href={profileHref ?? "/"} 
-                          className="flex items-center gap-2"
-                        >
-                          <User className="h-4 w-4" />
-                          Profile
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href="/app/tracker" className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          Job Tracker
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <div className="px-2 py-1.5">
-                    <ThemeToggle className="w-full" />
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
+                    <DropdownMenuItem asChild>
+                      <Link href={routes.settings.root} className="flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Settings
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive flex items-center gap-2">
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : ready ? (
               <>
-                <Link href="/login" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+                <Link
+                  href="/auth/login"
+                  className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+                >
                   Sign In
                 </Link>
                 <Button variant="primary" asChild>
-                  <Link href="/signup">Get Started</Link>
+                  <Link href="/auth/register">Get Started</Link>
                 </Button>
               </>
+            ) : (
+              <div className="h-8 w-24 animate-pulse rounded-full bg-muted/30" aria-hidden />
             )}
           </div>
 
@@ -186,72 +238,103 @@ export function Navbar() {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-          <SheetContent>
-            <div className="flex flex-col gap-4 mt-8">
+            <SheetContent>
+              <div className="flex flex-col gap-4 mt-8">
                 <SheetClose asChild>
                   <Link href="/jobs" className="text-lg font-medium hover:text-primary transition-colors">
                     Find Jobs
                   </Link>
                 </SheetClose>
-                {isLoggedIn && user ? (
-                  user.role === "employer" ? (
+                {isReadyAndAuthed ? (
+                  <>
                     <SheetClose asChild>
-                      <Link href="/dashboard/employer" className="text-lg font-medium hover:text-primary transition-colors">
+                      <Link
+                        href={dashboardHref}
+                        className="text-lg font-medium hover:text-primary transition-colors"
+                      >
                         Dashboard
                       </Link>
                     </SheetClose>
-                  ) : (
-                    <>
-                      <SheetClose asChild>
-                        <Link href="/app" className="text-lg font-medium hover:text-primary transition-colors">
-                          Dashboard
-                        </Link>
-                      </SheetClose>
-                      <SheetClose asChild>
-                        <Link
-                          href="/app/saved"
-                          className="text-lg font-medium hover:text-primary transition-colors"
-                        >
-                          Saved Jobs
-                        </Link>
-                      </SheetClose>
-                      <SheetClose asChild>
-                        <Link
-                          href="/app/saved-searches"
-                          className="text-lg font-medium hover:text-primary transition-colors"
-                        >
-                          Saved Searches
-                        </Link>
-                      </SheetClose>
-                      <SheetClose asChild>
-                        <Link href="/app/inbox" className="text-lg font-medium hover:text-primary transition-colors">
-                          Inbox
-                        </Link>
-                      </SheetClose>
-                      <SheetClose asChild>
-                        <Link href="/app/tracker" className="text-lg font-medium hover:text-primary transition-colors">
-                          Job Tracker
-                        </Link>
-                      </SheetClose>
-                    </>
-                  )
+                    <SheetClose asChild>
+                      <Link href="/alerts" className="text-lg font-medium hover:text-primary transition-colors">
+                        Alerts{demo && unreadAlerts ? ` (${unreadAlerts})` : ""}
+                      </Link>
+                    </SheetClose>
+                    {user?.role !== "employer" ? (
+                      <>
+                        <SheetClose asChild>
+                          <Link
+                            href="/app/saved"
+                            className="text-lg font-medium hover:text-primary transition-colors"
+                          >
+                            Saved Jobs
+                          </Link>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Link
+                            href="/app/saved-searches"
+                            className="text-lg font-medium hover:text-primary transition-colors"
+                          >
+                            Saved Searches
+                          </Link>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Link href="/app/inbox" className="text-lg font-medium hover:text-primary transition-colors">
+                            Inbox
+                          </Link>
+                        </SheetClose>
+                        <SheetClose asChild>
+                          <Link href="/app/tracker" className="text-lg font-medium hover:text-primary transition-colors">
+                            Job Tracker
+                          </Link>
+                        </SheetClose>
+                      </>
+                    ) : null}
+                    <SheetClose asChild>
+                      <Link
+                        href={profileHref ?? "/"}
+                        className="text-lg font-medium hover:text-primary transition-colors"
+                      >
+                        Profile
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link
+                        href={routes.settings.root}
+                        className="text-lg font-medium hover:text-primary transition-colors"
+                      >
+                        Settings
+                      </Link>
+                    </SheetClose>
+                  </>
                 ) : (
-                  <SheetClose asChild>
-                    <Link href="/dashboard/employer" className="text-lg font-medium hover:text-primary transition-colors">
-                      For Employers
-                    </Link>
-                  </SheetClose>
+                  <>
+                    {showSeekerNav ? (
+                      <SheetClose asChild>
+                        <Link href="/alerts" className="text-lg font-medium hover:text-primary transition-colors">
+                          Alerts{demo && unreadAlerts ? ` (${unreadAlerts})` : ""}
+                        </Link>
+                      </SheetClose>
+                    ) : (
+                      <SheetClose asChild>
+                        <Link href="/employer" className="text-lg font-medium hover:text-primary transition-colors">
+                          For Employers
+                        </Link>
+                      </SheetClose>
+                    )}
+                  </>
                 )}
                 <div className="flex flex-col gap-2 pt-4 border-t">
-                  {isLoggedIn && user ? (
+                  {isReadyAndAuthed ? (
                     <>
                       <div className="px-2 py-2 text-sm">
                         <p className="font-medium">{displayName}</p>
-                        <p className="text-muted-foreground text-xs">{user.email}</p>
+                        <p className="text-muted-foreground text-xs">{user?.email ?? ""}</p>
+                        <Badge variant="outline" className="mt-1 text-[10px]">
+                          {user?.role === "employer" ? "Employer" : "Seeker"}
+                        </Badge>
                       </div>
-                      <div className="px-2 py-2">
-                        <ThemeToggle className="w-full" />
-                      </div>
+                      <ThemeToggle className="w-full" />
                       <SheetClose asChild>
                         <Button type="button" variant="outline" onClick={handleLogout} className="w-full">
                           <LogOut className="h-4 w-4 mr-2" />
@@ -259,7 +342,7 @@ export function Navbar() {
                         </Button>
                       </SheetClose>
                     </>
-                  ) : (
+                  ) : ready ? (
                     <>
                       <SheetClose asChild>
                         <Link
@@ -271,10 +354,12 @@ export function Navbar() {
                       </SheetClose>
                       <SheetClose asChild>
                         <Button variant="primary" asChild>
-                          <Link href="/signup">Get Started</Link>
+                          <Link href="/auth/register">Get Started</Link>
                         </Button>
                       </SheetClose>
                     </>
+                  ) : (
+                    <div className="h-10 w-full animate-pulse rounded bg-muted/30" aria-hidden />
                   )}
                 </div>
               </div>
