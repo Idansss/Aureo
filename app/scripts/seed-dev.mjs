@@ -44,22 +44,27 @@ async function ensureUser({ email, role, fullName }) {
 }
 
 async function main() {
-  console.log("Seeding dev data…");
+  console.log("Seeding dev data…\n");
 
+  // Create users
+  console.log("Creating users...");
   const employerUser = await ensureUser({
     email: EMPLOYER_EMAIL,
     role: "employer",
     fullName: "Northwind Hiring Team",
   });
+  console.log(`✓ Employer user: ${EMPLOYER_EMAIL}`);
 
   const seekerUser = await ensureUser({
     email: SEEKER_EMAIL,
     role: "seeker",
     fullName: "Aureo Seeker",
   });
+  console.log(`✓ Seeker user: ${SEEKER_EMAIL}`);
 
   // Profiles
-  await supabase.from("profiles").upsert([
+  console.log("\nCreating profiles...");
+  const { error: profilesError } = await supabase.from("profiles").upsert([
     {
       id: employerUser.id,
       email: employerUser.email,
@@ -67,6 +72,10 @@ async function main() {
       full_name: employerUser.user_metadata?.full_name ?? "Northwind Hiring Team",
       headline: "Hiring for calm, high-signal teams",
       location: "Remote",
+      links: {}, // Required field - empty object for employer
+      skills: [], // Required field - empty array for employer
+      experience: [], // Required field - empty array for employer
+      projects: [], // Required field - empty array for employer
       is_public: false,
     },
     {
@@ -78,11 +87,31 @@ async function main() {
       location: "Remote",
       skills: ["TypeScript", "React", "Postgres"],
       links: { portfolio: "https://example.com" },
+      experience: [], // Required field
+      projects: [], // Required field
       is_public: true,
     },
-  ]);
+  ], { onConflict: "id" });
+
+  if (profilesError) {
+    throw new Error(`Failed to create profiles: ${profilesError.message}. Make sure database migrations have been run!`);
+  }
+
+  // Verify profiles were created
+  const { data: employerProfile, error: checkError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", employerUser.id)
+    .single();
+
+  if (checkError || !employerProfile) {
+    throw new Error(`Profile verification failed: ${checkError?.message || "Profile not found"}. Make sure database migrations have been run!`);
+  }
+
+  console.log("✓ Profiles created successfully");
 
   // Company
+  console.log("\nCreating company...");
   const { data: companyRow, error: companyErr } = await supabase
     .from("companies")
     .upsert(
@@ -102,15 +131,20 @@ async function main() {
     .select("id,slug")
     .single();
   if (companyErr) throw new Error(`Company upsert failed: ${companyErr.message}`);
+  console.log(`✓ Company created: ${companyRow.slug}`);
 
   const companyId = companyRow.id;
 
-  await supabase.from("company_members").upsert(
+  // Company member
+  const { error: memberErr } = await supabase.from("company_members").upsert(
     { company_id: companyId, user_id: employerUser.id, member_role: "owner" },
     { onConflict: "company_id,user_id" },
   );
+  if (memberErr) throw new Error(`Company member failed: ${memberErr.message}`);
+  console.log("✓ Company member added");
 
-  // Jobs (ensure by title)
+  // Jobs
+  console.log("\nCreating jobs...");
   const jobTemplates = [
     {
       title: "Senior Frontend Engineer",
@@ -162,6 +196,7 @@ async function main() {
     const existingId = existingByTitle.get(t.title);
     if (existingId) {
       createdJobIds.push(existingId);
+      console.log(`  - Job exists: ${t.title}`);
       continue;
     }
     const { data: inserted, error } = await supabase
@@ -175,27 +210,50 @@ async function main() {
       .single();
     if (error) throw new Error(`Job insert failed: ${error.message}`);
     createdJobIds.push(String(inserted.id));
+    console.log(`  ✓ Created job: ${t.title}`);
+  }
+
+  if (createdJobIds.length < 2) {
+    throw new Error(`Need at least 2 jobs, but only have ${createdJobIds.length}`);
   }
 
   const [jobA, jobB] = createdJobIds;
 
   // Application
-  await supabase.from("applications").upsert(
+  console.log("\nCreating application...");
+  const { error: appErr } = await supabase.from("applications").upsert(
     { job_id: jobA, user_id: seekerUser.id, status: "applied" },
     { onConflict: "job_id,user_id" },
   );
+  if (appErr) throw new Error(`Application failed: ${appErr.message}`);
+  console.log("✓ Application created");
 
   // Saved job
-  await supabase.from("saved_jobs").upsert(
+  console.log("\nCreating saved job...");
+  const { error: savedJobErr } = await supabase.from("saved_jobs").upsert(
     { user_id: seekerUser.id, job_id: jobB },
     { onConflict: "user_id,job_id" },
   );
+  if (savedJobErr) throw new Error(`Saved job failed: ${savedJobErr.message}`);
+  console.log("✓ Saved job created");
 
-  // Saved search
-  const { data: savedSearch, error: savedSearchErr } = await supabase
+  // Saved search - Check if exists first since there's no unique constraint
+  console.log("\nCreating saved search...");
+  const { data: existingSearch } = await supabase
     .from("saved_searches")
-    .upsert(
-      {
+    .select("id")
+    .eq("user_id", seekerUser.id)
+    .eq("name", "Remote roles")
+    .maybeSingle();
+
+  let savedSearchId;
+  if (existingSearch) {
+    savedSearchId = existingSearch.id;
+    console.log("  - Saved search already exists");
+  } else {
+    const { data: newSearch, error: savedSearchErr } = await supabase
+      .from("saved_searches")
+      .insert({
         user_id: seekerUser.id,
         name: "Remote roles",
         query: "remote",
@@ -203,17 +261,19 @@ async function main() {
         schedule: { frequency: "daily" },
         delivery: { inbox: true, email: false },
         active: true,
-      },
-      { onConflict: "user_id,name" },
-    )
-    .select("id")
-    .single();
-  if (savedSearchErr) throw new Error(`Saved search upsert failed: ${savedSearchErr.message}`);
+      })
+      .select("id")
+      .single();
+    if (savedSearchErr) throw new Error(`Saved search insert failed: ${savedSearchErr.message}`);
+    savedSearchId = newSearch.id;
+    console.log("✓ Saved search created");
+  }
 
-  // Digest (best-effort)
-  await supabase.from("search_digests").insert({
+  // Digest (best-effort, ignore errors)
+  console.log("\nCreating search digest...");
+  const { error: digestErr } = await supabase.from("search_digests").insert({
     user_id: seekerUser.id,
-    saved_search_id: savedSearch.id,
+    saved_search_id: savedSearchId,
     summary_rows: [
       {
         jobId: jobA,
@@ -226,26 +286,39 @@ async function main() {
       },
     ],
   });
+  if (digestErr) {
+    console.log(`  ⚠️  Digest creation skipped: ${digestErr.message}`);
+  } else {
+    console.log("✓ Search digest created");
+  }
 
   // Notification
-  await supabase.from("notifications").insert({
+  console.log("\nCreating notification...");
+  const { error: notifErr } = await supabase.from("notifications").insert({
     user_id: seekerUser.id,
     type: "alert_match",
     title: "1 new job matches your saved search",
     body: `${jobTemplates[0].title} at Northwind`,
     data: { job_id: jobA },
   });
+  if (notifErr) {
+    console.log(`  ⚠️  Notification creation skipped: ${notifErr.message}`);
+  } else {
+    console.log("✓ Notification created");
+  }
 
-  console.log("Seed complete.");
-  console.log(`Employer: ${EMPLOYER_EMAIL} / ${PASSWORD}`);
+  console.log("\n" + "=".repeat(50));
+  console.log("✅ Seed complete!");
+  console.log("=".repeat(50));
+  console.log(`\nEmployer: ${EMPLOYER_EMAIL} / ${PASSWORD}`);
   console.log(`Seeker:   ${SEEKER_EMAIL} / ${PASSWORD}`);
+  console.log(`\nCompany: Northwind (slug: northwind)`);
+  console.log(`Jobs: ${createdJobIds.length} created`);
+  console.log("\n");
 }
 
 main().catch((e) => {
+  console.error("\n❌ Error:", e.message);
   console.error(e);
   process.exit(1);
 });
-
-
-
-

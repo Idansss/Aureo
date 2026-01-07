@@ -9,7 +9,12 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "audit:employer": "node scripts/audit-employer-ctas.mjs",
-    "seed:dev": "node scripts/seed-dev.mjs"
+    "seed:dev": "node scripts/seed-dev.mjs",
+    "setup:supabase": "node scripts/setup-supabase.mjs",
+    "setup:cron": "node scripts/setup-cron.mjs",
+    "migrate": "node scripts/run-migrations.mjs",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "verify:seed": "node scripts/verify-seed.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
