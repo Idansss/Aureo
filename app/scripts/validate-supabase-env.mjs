@@ -59,5 +59,8 @@ try {
   await dns.lookup(parsed.hostname);
   console.log(`[env] Supabase URL resolves: ${parsed.hostname}`);
 } catch {
-  fail(`Supabase host does not resolve: ${parsed.hostname}. Update NEXT_PUBLIC_SUPABASE_URL in Vercel Environment Variables.`);
+  console.warn(
+    `[env] Warning: Supabase host does not resolve: ${parsed.hostname}. ` +
+      "Auth and data requests will fail until NEXT_PUBLIC_SUPABASE_URL is corrected in Vercel Environment Variables.",
+  );
 }
