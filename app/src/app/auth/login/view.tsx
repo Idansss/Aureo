@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { getSupabaseAuthErrorMessage } from "@/lib/env";
 import { resolvePostAuthRedirect } from "@/lib/safe-redirect";
 
 const LoginSchema = z.object({
@@ -33,63 +34,67 @@ export function LoginForm({ next }: { next?: string }) {
   });
 
   const onSubmit = async (values: LoginValues) => {
-    const supabase = supabaseBrowser();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
-      password: values.password,
-    });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData.session;
-    if (!session) {
-      toast.error("Sign-in succeeded but no session was created. Try again.");
-      return;
-    }
-
-    // Dispatch session change event to update UI
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("aureo:session-change"));
-    }
-
-    const user = session.user;
-    let role: string | null | undefined = user.user_metadata?.role;
-
-    // Ensure a profiles row exists for this user (older accounts may be missing it).
-    const fullName = (user.user_metadata?.full_name as string | undefined) ?? null;
-    const email = user.email ?? null;
-    if (user?.id) {
-      const { error: upsertError } = await supabase.from("profiles").upsert({
-        id: user.id,
-        email,
-        full_name: fullName,
-        role: role ?? "seeker",
+    try {
+      const supabase = supabaseBrowser();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
       });
-      if (upsertError) {
-        console.warn("[auth] profile upsert failed", upsertError.message);
+
+      if (error) {
+        toast.error(error.message);
+        return;
       }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+      if (!session) {
+        toast.error("Sign-in succeeded but no session was created. Try again.");
+        return;
+      }
+
+      // Dispatch session change event to update UI
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("aureo:session-change"));
+      }
+
+      const user = session.user;
+      let role: string | null | undefined = user.user_metadata?.role;
+
+      // Ensure a profiles row exists for this user (older accounts may be missing it).
+      const fullName = (user.user_metadata?.full_name as string | undefined) ?? null;
+      const email = user.email ?? null;
+      if (user?.id) {
+        const { error: upsertError } = await supabase.from("profiles").upsert({
+          id: user.id,
+          email,
+          full_name: fullName,
+          role: role ?? "seeker",
+        });
+        if (upsertError) {
+          console.warn("[auth] profile upsert failed", upsertError.message);
+        }
+      }
+
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileRow?.role) role = profileRow.role;
+
+      const destination = resolvePostAuthRedirect({
+        role,
+        next: values.next ?? next,
+      });
+
+      toast.success("Welcome back to Aureo.");
+      router.replace(destination);
+      router.refresh();
+    } catch (error) {
+      toast.error(getSupabaseAuthErrorMessage(error));
     }
-
-    const { data: profileRow } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profileRow?.role) role = profileRow.role;
-
-    const destination = resolvePostAuthRedirect({
-      role,
-      next: values.next ?? next,
-    });
-
-    toast.success("Welcome back to Aureo.");
-    router.replace(destination);
-    router.refresh();
   };
 
   return (

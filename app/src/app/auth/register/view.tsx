@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { getSupabaseAuthErrorMessage } from "@/lib/env";
 import { resolvePostAuthRedirect, resolveSafeNext } from "@/lib/safe-redirect";
 
 const RegisterSchema = z.object({
@@ -65,59 +66,63 @@ export function RegisterForm({ next }: { next?: string }) {
 
   const onSubmit = async (values: RegisterValues) => {
     const safeNext = resolveSafeNext(values.next) ?? safeNextFromProps;
-    const supabase = supabaseBrowser();
-    const emailRedirectTo = buildEmailRedirectTo(safeNext);
-    const { data, error } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-      options: {
-        data: {
+    try {
+      const supabase = supabaseBrowser();
+      const emailRedirectTo = buildEmailRedirectTo(safeNext);
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.fullName,
+            role: values.accountType,
+          },
+          emailRedirectTo,
+        },
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+
+      if (!session) {
+        setConfirmationEmail(values.email);
+        toast.success("Check your email to confirm your account.");
+        return;
+      }
+
+      const user = session.user ?? data.user;
+      if (user?.id) {
+        const { error: profileError } = await supabase.from("profiles").upsert({
+          id: user.id,
           full_name: values.fullName,
           role: values.accountType,
-        },
-        emailRedirectTo,
-      },
-    });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData.session;
-
-    if (!session) {
-      setConfirmationEmail(values.email);
-      toast.success("Check your email to confirm your account.");
-      return;
-    }
-
-    const user = session.user ?? data.user;
-    if (user?.id) {
-      const { error: profileError } = await supabase.from("profiles").upsert({
-        id: user.id,
-        full_name: values.fullName,
-        role: values.accountType,
-      });
-      if (profileError) {
-        console.warn("[auth] profile upsert failed", profileError.message);
+        });
+        if (profileError) {
+          console.warn("[auth] profile upsert failed", profileError.message);
+        }
       }
+
+      const destination = resolvePostAuthRedirect({
+        role: values.accountType,
+        next: safeNext,
+      });
+
+      // Dispatch session change event to update UI
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("aureo:session-change"));
+      }
+
+      toast.success("Account created. Welcome!");
+      router.replace(destination);
+      router.refresh();
+    } catch (error) {
+      toast.error(getSupabaseAuthErrorMessage(error));
     }
-
-    const destination = resolvePostAuthRedirect({
-      role: values.accountType,
-      next: safeNext,
-    });
-
-    // Dispatch session change event to update UI
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("aureo:session-change"));
-    }
-
-    toast.success("Account created. Welcome!");
-    router.replace(destination);
-    router.refresh();
   };
 
   if (confirmationEmail) {
@@ -160,6 +165,8 @@ export function RegisterForm({ next }: { next?: string }) {
                 } else {
                   toast.success("Confirmation email resent.");
                 }
+              } catch (error) {
+                toast.error(getSupabaseAuthErrorMessage(error));
               } finally {
                 setResending(false);
               }
